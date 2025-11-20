@@ -358,4 +358,5 @@ elements.restartBtn.addEventListener('click', initializeGame);
 elements.whatsappBtn.addEventListener('click', sendWhatsAppResult);
 
 // Inicialización
+
 document.addEventListener('DOMContentLoaded', initializeGame);
