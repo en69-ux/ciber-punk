@@ -1,0 +1,361 @@
+// --- DATOS DEL JUEGO ---
+const QUESTIONS = [
+    {
+        q: "¿Cuál es el nombre del protagonista principal de Cyberpunk 2077?",
+        a: "V",
+        options: ["Jackie", "Johnny Silverhand", "V", "David Martinez"],
+        exp: "El protagonista que personalizas y juegas en Cyberpunk 2077 se conoce por el apodo de V. Su nombre completo (Vincent o Valerie) depende de la elección del jugador."
+    },
+    {
+        q: "¿Quién es el famoso 'Rockerboy' cuya conciencia está atrapada en un chip?",
+        a: "Johnny Silverhand",
+        options: ["Rogue Amendiares", "Adam Smasher", "Kerry Eurodyne", "Johnny Silverhand"],
+        exp: "Johnny Silverhand, interpretado por Keanu Reeves, fue un famoso músico y activista en Night City cuya 'enramada' (engram) se almacena en el Relic."
+    },
+    {
+        q: "¿Qué corporación es conocida por su dominio en el mercado de la bioingeniería y la inmortalidad?",
+        a: "Arasaka",
+        options: ["Militech", "Kang Tao", "Arasaka", "Trauma Team"],
+        exp: "Arasaka es la megacorporación japonesa centrada en la seguridad, la fabricación y, crucialmente, la tecnología de la 'enramada' (como el Relic) para la inmortalidad digital."
+    },
+    {
+        q: "¿Cuál es el nombre del implante militar avanzado que usa David en Cyberpunk: Edgerunners?",
+        a: "El Sandevistan",
+        options: ["El Chrome Espectral", "El Cyberdeck", "El Sandevistan", "El Synaptic Accelerator"],
+        exp: "David Martinez instala el Sandevistan, un implante que permite al usuario moverse a velocidades sobrehumanas, un elemento clave de la serie Edgerunners."
+    },
+    {
+        q: "¿Qué banda sonora es el tema principal de David Martinez en la serie Edgerunners?",
+        a: "I Really Want to Stay At Your House",
+        options: ["Never Fade Away", "Pon Pon Shit", "I Really Want to Stay At Your House", "Chippin' In"],
+        exp: "La canción 'I Really Want to Stay At Your House' de Rosa Walton y Hallie Coggins es el tema que define la relación entre David y Lucy, y la emocionalidad de la serie."
+    }
+    // Agregar más preguntas aquí...
+];
+
+// --- VARIABLES DE ESTADO DEL JUEGO ---
+let currentQuestionIndex = 0;
+let score = 0;
+let streak = 0;
+let timer = 30; // Tiempo inicial por pregunta
+let timerInterval;
+
+// --- CONTADORES DE AYUDAS ---
+const lifelines = {
+    '50/50': 3,
+    'timer': 2,
+    'reveal': 1
+};
+
+// --- ELEMENTOS DEL DOM ---
+const elements = {
+    startScreen: document.getElementById('start-screen'),
+    quizScreen: document.getElementById('quiz-screen'),
+    resultsScreen: document.getElementById('results-screen'),
+    startBtn: document.getElementById('start-quiz-btn'),
+    
+    questionCounter: document.getElementById('question-counter'),
+    scoreDisplay: document.getElementById('score-display'),
+    timerDisplay: document.getElementById('timer-display'),
+    questionText: document.getElementById('question-text'),
+    answerButtons: document.getElementById('answer-buttons'),
+    
+    lifeline5050: document.getElementById('lifeline-50-50'),
+    lifelineTimer: document.getElementById('lifeline-timer'),
+    lifelineReveal: document.getElementById('lifeline-reveal'),
+    
+    feedbackModal: document.getElementById('feedback-modal'),
+    feedbackStatus: document.getElementById('feedback-status'),
+    correctAnswerText: document.querySelector('#correct-answer-text span'),
+    explanationText: document.getElementById('explanation-text'),
+    nextQuestionBtn: document.getElementById('next-question-btn'),
+    
+    finalScore: document.getElementById('final-score'),
+    finalTier: document.getElementById('final-tier'),
+    restartBtn: document.getElementById('restart-quiz-btn'),
+    whatsappBtn: document.getElementById('whatsapp-share-btn')
+};
+
+// --- FUNCIONES DEL JUEGO ---
+
+/** Inicia el contador de tiempo */
+function startTimer() {
+    clearInterval(timerInterval);
+    timer = 30; // Reset
+    elements.timerDisplay.textContent = timer;
+    elements.timerDisplay.classList.remove('timer-low');
+
+    timerInterval = setInterval(() => {
+        timer--;
+        elements.timerDisplay.textContent = timer;
+        
+        if (timer <= 10) {
+            elements.timerDisplay.classList.add('timer-low');
+        }
+
+        if (timer <= 0) {
+            clearInterval(timerInterval);
+            handleAnswerSelection(null, false); // Tratar como respuesta incorrecta/tiempo agotado
+        }
+    }, 1000);
+}
+
+/** Muestra la pregunta actual en el DOM */
+function showQuestion() {
+    if (currentQuestionIndex >= QUESTIONS.length) {
+        return showResults();
+    }
+    
+    const qData = QUESTIONS[currentQuestionIndex];
+    
+    // Animación de cambio de pregunta (glitch)
+    elements.quizScreen.classList.add('glitch-animation');
+    setTimeout(() => {
+        elements.quizScreen.classList.remove('glitch-animation');
+    }, 200);
+
+    // Actualiza HUD
+    elements.questionCounter.textContent = `[DATOS // ${currentQuestionIndex + 1}/${QUESTIONS.length}]`;
+    elements.questionText.textContent = qData.q;
+    elements.answerButtons.innerHTML = ''; // Limpia botones
+
+    // Crea y añade los botones de respuesta
+    qData.options.forEach(option => {
+        const button = document.createElement('button');
+        button.textContent = option;
+        button.classList.add('answer-btn');
+        button.onclick = () => handleAnswerSelection(option, true);
+        elements.answerButtons.appendChild(button);
+    });
+
+    // Reinicia el timer para la nueva pregunta
+    startTimer();
+}
+
+/** Maneja la selección de una respuesta */
+function handleAnswerSelection(selectedOption, clicked) {
+    clearInterval(timerInterval); // Detiene el tiempo
+    const qData = QUESTIONS[currentQuestionIndex];
+    const isCorrect = selectedOption === qData.a;
+
+    // Deshabilita todos los botones de respuesta
+    Array.from(elements.answerButtons.children).forEach(btn => {
+        btn.disabled = true;
+        if (btn.textContent === qData.a) {
+            btn.classList.add('correct'); // Resalta la correcta
+        } else if (clicked && btn.textContent === selectedOption) {
+            btn.classList.add('wrong'); // Marca la incorrecta elegida
+        }
+    });
+
+    if (isCorrect) {
+        score += 10;
+        streak++;
+        elements.scoreDisplay.textContent = `PUNTOS: ${score}`;
+        
+        // BONO 50/50 por racha de 5
+        if (streak % 5 === 0 && streak > 0) {
+             lifelines['50/50']++;
+             updateLifelineDisplay(elements.lifeline5050, '50/50');
+             alert(`¡CONEXIÓN ESTABLE! Racha de ${streak}. Recibes +1 uso de 50/50.`);
+        }
+
+        showFeedback(true, qData);
+    } else {
+        streak = 0; // Rompe la racha
+        showFeedback(false, qData);
+    }
+}
+
+/** Muestra el modal de feedback (explicación) */
+function showFeedback(isCorrect, qData) {
+    elements.feedbackModal.classList.remove('hidden');
+    
+    if (isCorrect) {
+        elements.feedbackStatus.textContent = '[ESTADO: ÉXITO DE DATOS]';
+        elements.feedbackStatus.style.color = 'var(--neon-cyan)';
+    } else {
+        elements.feedbackStatus.textContent = '[ESTADO: ERROR CRÍTICO]';
+        elements.feedbackStatus.style.color = 'var(--neon-red)';
+    }
+
+    elements.correctAnswerText.textContent = qData.a;
+    elements.explanationText.textContent = qData.exp;
+}
+
+/** Pasa a la siguiente pregunta */
+function nextQuestion() {
+    elements.feedbackModal.classList.add('hidden');
+    currentQuestionIndex++;
+    showQuestion();
+}
+
+/** Actualiza la visualización de un botón de ayuda */
+function updateLifelineDisplay(element, key) {
+    element.querySelector('.uses-count').textContent = lifelines[key];
+    if (lifelines[key] === 0) {
+        element.setAttribute('data-uses', 0); // Para CSS
+        element.disabled = true;
+    } else {
+        element.setAttribute('data-uses', lifelines[key]);
+        element.disabled = false;
+    }
+}
+
+// --- LÓGICA DE AYUDAS ---
+
+function handleLifeline5050() {
+    if (lifelines['50/50'] <= 0) return;
+    
+    lifelines['50/50']--;
+    updateLifelineDisplay(elements.lifeline5050, '50/50');
+    
+    const qData = QUESTIONS[currentQuestionIndex];
+    const correctAns = qData.a;
+    const incorrectOptions = qData.options.filter(opt => opt !== correctAns);
+    
+    // Selecciona dos incorrectas al azar para eliminar
+    const optionsToEliminate = incorrectOptions.sort(() => 0.5 - Math.random()).slice(0, 2);
+    
+    // Desactiva los botones de las opciones a eliminar
+    Array.from(elements.answerButtons.children).forEach(btn => {
+        if (optionsToEliminate.includes(btn.textContent)) {
+            btn.disabled = true;
+        }
+    });
+}
+
+function handleLifelineTimer() {
+    if (lifelines['timer'] <= 0) return;
+    
+    lifelines['timer']--;
+    updateLifelineDisplay(elements.lifelineTimer, 'timer');
+
+    // Añade 15 segundos al tiempo restante
+    timer += 15;
+    // Si la animación de bajo tiempo está activa, la quita
+    elements.timerDisplay.classList.remove('timer-low');
+}
+
+function handleLifelineReveal() {
+    if (lifelines['reveal'] <= 0) return;
+    
+    lifelines['reveal']--;
+    updateLifelineDisplay(elements.lifelineReveal, 'reveal');
+    
+    const qData = QUESTIONS[currentQuestionIndex];
+    
+    // Resalta la respuesta correcta
+    Array.from(elements.answerButtons.children).forEach(btn => {
+        if (btn.textContent === qData.a) {
+            btn.style.boxShadow = '0 0 20px var(--neon-magenta)';
+        }
+    });
+    
+    // Una vez usado, el botón queda permanentemente desactivado
+    elements.lifelineReveal.disabled = true; 
+}
+
+// --- PANTALLA DE RESULTADOS Y WHATSAPP ---
+
+/** Determina la calificación (Tier) del jugador */
+function getTier(finalScore) {
+    const totalPoints = QUESTIONS.length * 10;
+    const percentage = (finalScore / totalPoints) * 100;
+    
+    if (percentage >= 90) return { tier: "NETRUNNER LEGENDARIO", color: 'var(--neon-cyan)' };
+    if (percentage >= 70) return { tier: "SOLO DE NIGHT CITY", color: 'var(--neon-yellow)' };
+    if (percentage >= 50) return { tier: "ROCKERBOY/ROCKERGIRL", color: 'var(--neon-magenta)' };
+    return { tier: "GUTTERPUNK", color: 'var(--neon-red)' };
+}
+
+/** Muestra la pantalla final */
+function showResults() {
+    elements.quizScreen.classList.remove('active');
+    elements.quizScreen.classList.add('hidden');
+    elements.resultsScreen.classList.remove('hidden');
+    elements.resultsScreen.classList.add('active');
+
+    const result = getTier(score);
+    
+    elements.finalScore.textContent = score;
+    elements.finalTier.textContent = result.tier;
+    elements.finalTier.style.color = result.color;
+    elements.finalTier.style.textShadow = `0 0 10px ${result.color}`;
+}
+
+/** Prepara el mensaje y abre WhatsApp */
+function sendWhatsAppResult() {
+    const TEACHER_PHONE = '5493816490060'; // Número del docente con '9' para móvil
+    const result = getTier(score);
+
+    const message = `¡Informe de Datos!
+Docente, he completado el Cyberpunk Quiz.
+
+Puntuación: ${score}
+Calificación: ${result.tier}
+
+¡Listo para el próximo Gig!`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappURL = `https://wa.me/${TEACHER_PHONE}?text=${encodedMessage}`;
+    
+    window.open(whatsappURL, '_blank');
+}
+
+// --- INICIO DEL JUEGO / RESET ---
+function initializeGame() {
+    currentQuestionIndex = 0;
+    score = 0;
+    streak = 0;
+    timer = 30;
+    lifelines['50/50'] = 3;
+    lifelines['timer'] = 2;
+    lifelines['reveal'] = 1;
+
+    elements.scoreDisplay.textContent = 'PUNTOS: 0';
+    elements.timerDisplay.textContent = '00';
+    clearInterval(timerInterval);
+
+    // Actualizar displays de ayudas
+    updateLifelineDisplay(elements.lifeline5050, '50/50');
+    updateLifelineDisplay(elements.lifelineTimer, 'timer');
+    updateLifelineDisplay(elements.lifelineReveal, 'reveal');
+    elements.lifelineReveal.style.boxShadow = 'none'; // Limpia el resaltado
+
+    // Transición de pantallas
+    elements.resultsScreen.classList.remove('active');
+    elements.resultsScreen.classList.add('hidden');
+    elements.quizScreen.classList.remove('active');
+    elements.quizScreen.classList.add('hidden');
+    elements.startScreen.classList.remove('hidden');
+    elements.startScreen.classList.add('active');
+}
+
+// --- LISTENERS DE EVENTOS ---
+
+// Pantalla de inicio
+elements.startBtn.addEventListener('click', () => {
+    // Animación de salida de la pantalla de inicio
+    elements.startScreen.classList.add('hidden');
+    setTimeout(() => {
+        elements.quizScreen.classList.remove('hidden');
+        elements.quizScreen.classList.add('active');
+        showQuestion();
+    }, 500); // Espera a que termine la animación
+});
+
+// Botón de Siguiente (en Modal de Feedback)
+elements.nextQuestionBtn.addEventListener('click', nextQuestion);
+
+// Botones de Ayuda
+elements.lifeline5050.addEventListener('click', handleLifeline5050);
+elements.lifelineTimer.addEventListener('click', handleLifelineTimer);
+elements.lifelineReveal.addEventListener('click', handleLifelineReveal);
+
+// Botones de Resultados
+elements.restartBtn.addEventListener('click', initializeGame);
+elements.whatsappBtn.addEventListener('click', sendWhatsAppResult);
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', initializeGame);
